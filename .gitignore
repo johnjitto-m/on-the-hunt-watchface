@@ -1,0 +1,10 @@
+# Never commit signing keys
+*.jks
+*.keystore
+*.idsig
+# Build output
+out/
+build/
+*.apk
+!release/*.apk
+__pycache__/
