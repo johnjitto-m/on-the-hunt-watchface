@@ -42,7 +42,7 @@ Built in Google's **Watch Face Format**, so it works on **Galaxy Watch 4 → 8 /
 ## Install
 
 1. Download **`OnTheHunt-watchface-v2.6.apk`** from the [**Releases**](../../releases) page.
-2. Follow **[INSTALL.md](INSTALL.md)**: about 10 minutes the first time (Wi-Fi debugging + one `adb install` command from Windows, macOS or Linux).
+2. Follow **[INSTALL.md](INSTALL.md)**: about 10 minutes the first time. Do it **from your Android phone with a free app (no computer needed)**, or with one `adb install` command from Windows, macOS or Linux.
 3. On the watch: touch and hold the face → swipe to **+ Add watch face** → **On the Hunt**.
 
 **Requirements:** round Wear OS 4+ watch (Galaxy Watch 4 or newer on current software, Pixel Watch, etc.). Weather, moon phase and step goal come from your watch (Samsung Health / Google Fit and the weather service).
