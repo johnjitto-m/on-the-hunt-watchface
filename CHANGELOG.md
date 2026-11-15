@@ -1,5 +1,26 @@
 # Changelog
 
+## v2.9.2
+- Steps show just the numbers: the everyday "Today's bounty / Tonight's bounty" label is gone (festival greetings and the behind-pace nudge still appear there on their days)
+
+## v2.9
+- New **lit-window dot font**, made for this face (`tools/dotfont.py`)
+- Time: white dot font with a soft glow, a little smaller; the always-on time uses it too
+- Date moved from the top line to cyan dot text on the left: day and month, the weekday, and a Sun–Sat row with today lit; tap opens Calendar
+- Heart rate restyled in red dot text on the right: the heart beats at your actual pulse; CALM → ALERT (100+) → RUSH (140+); shows ♥-- with no reading
+- A faint cyan / red neon glow on the buildings around them; temperature removed from the date
+
+## v2.8
+- Rebuilt motion: a new rig with bending arms, real hands and smooth eased movement; he crouches to pat the dog (knees forward), flips a coin, sips his coffee
+- Battery became a colour-coded arc on the left edge (green / yellow / red, no number, breathes while charging); the "COMBAT READY" texts are gone
+
+## v2.7
+- Bigger, more detailed man and a new golden retriever
+- They react to the time of day, weather, notifications and activity: morning yawn, umbrella in rain and storms, scarf in snow, panting in the heat, jogging during workouts, the dog asleep late at night
+- Lighting follows the sun: golden mornings and evenings, a night grade
+- Festivals: Diwali (string lights, diyas, fireworks), Christmas, New Year's Eve
+- Always-on screen with a dim silhouette; a complication under the time (next event by default)
+
 ## v2.6
 - He and the dog now interact: walking together on wake, then the dog sits and looks up at him while he glances down
 - Tap them for one of four calm moves: head scratch, coin flip the dog follows, the pat, coffee while the dog watches

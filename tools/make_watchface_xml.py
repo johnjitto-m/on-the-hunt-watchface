@@ -1,12 +1,18 @@
+"""Generate res/raw/watchface.xml for 'On the Hunt' v2.9 (Watch Face Format v2).
+v2.9.2: no everyday bounty label over the steps. v2.9.1: date (cyan) + pulse (red) in a lit-window dot font floating over the city, no boxes; time in the dot font, white, a bit smaller.
+Bigger, more detailed duo that reacts to time of day, weather, notifications and activity;
+festivals (Diwali, Christmas, New Year); always-on screen; a complication slot under the time."""
 import json, os
-LISTS = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "duo_lists.json")))
-OUT_XML = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "watchface/src/main/res/raw/watchface.xml")
-"""Generate res/raw/watchface.xml for 'On the Hunt' v2.6 (Watch Face Format v2).
-Hero: the coffee guy (original character). Steps = today's bounty, battery = health."""
+from PIL import Image
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ART = json.load(open(os.path.join(HERE, 'art28.json')))
+GEO = json.load(open(os.path.join(HERE, 'towers29.json')))
+DRW = os.path.join(HERE, '..', 'watchface/src/main/res/drawable/')
+OUT_XML = os.path.join(HERE, '..', 'watchface/src/main/res/raw/watchface.xml')
+
 OSW, OSWM, BOD = 'oswald_regular', 'oswald_medium', 'bebas_neue'
 P = '([STEP_PERCENT] &gt; 100 ? 100 : [STEP_PERCENT])'
-FIGX = f'(24 + 2.3 * {P})'
-DOGX = f'({FIGX} &gt;= 60 ? {FIGX} - 30 : {FIGX} + 72)'
 SECF = '(([SECOND] % 60) + [MILLISECOND] / 1000)'
 GOLD, GOLDL, RED, CREAM, PINK = '#d4af37', '#ecd27a', '#e0213b', '#e8d9a8', '#ff7a8a'
 
@@ -14,8 +20,16 @@ E_DONE = '[STEP_COUNT] >= [STEP_GOAL] && [STEP_GOAL] > 0'
 E_NIGHT = '([WEATHER.IS_AVAILABLE] == 1 && [WEATHER.IS_DAY] == 0) || ([WEATHER.IS_AVAILABLE] != 1 && ([HOUR_0_23] >= 18 || [HOUR_0_23] < 6))'
 E_CHG = '[BATTERY_CHARGING_STATUS] == 1'
 E_LOW = '[BATTERY_PERCENT] < 20'
-E_BEHIND = ('[HOUR_0_23] >= 10 && [HOUR_0_23] < 22 && [STEP_PERCENT] < (([HOUR_0_23] + [MINUTE] / 60 - 8) / 13 * 100 - 30)')
-E_DOGLEFT = '(24 + 2.3 * ([STEP_PERCENT] > 100 ? 100 : [STEP_PERCENT])) >= 60'
+E_BEHIND = '[HOUR_0_23] >= 10 && [HOUR_0_23] < 22 && [STEP_PERCENT] < (([HOUR_0_23] + [MINUTE] / 60 - 8) / 13 * 100 - 30)'
+E_NOTIF = '[UNREAD_NOTIFICATION_COUNT] > 0'
+E_WORK = '[HEART_RATE] >= 110'
+TC = '([WEATHER.TEMPERATURE_UNIT] == 2 ? ([WEATHER.TEMPERATURE] - 32) / 1.8 : [WEATHER.TEMPERATURE])'
+E_HOT = f'[WEATHER.IS_AVAILABLE] == 1 && {TC} >= 32 && [HOUR_0_23] >= 9 && [HOUR_0_23] < 19'
+E_COLD = f'[WEATHER.IS_AVAILABLE] == 1 && {TC} <= 6'
+E_LATE = '[HOUR_0_23] >= 22 || [HOUR_0_23] < 5'
+E_MORNING = '[HOUR_0_23] >= 5 && [HOUR_0_23] < 9'
+E_AM = '[HOUR_0_23] >= 5 && [HOUR_0_23] < 8'
+E_PM = '[HOUR_0_23] >= 16 && [HOUR_0_23] < 19'
 
 
 def wx(*codes):
@@ -23,13 +37,32 @@ def wx(*codes):
 
 
 E_STORM, E_RAIN, E_SNOW, E_FOG, E_CLOUD = wx(9), wx(4, 6, 10, 12), wx(5, 7, 11), wx(3, 13), wx(2, 14)
+# festivals: Diwali = the 5-day window around Lakshmi Puja (2026-2030)
+DIWALI = ((2026, 11, 8), (2027, 10, 29), (2028, 10, 17), (2029, 11, 5), (2030, 10, 26))
+E_DIWALI = ' || '.join(f'([YEAR] == {y} && [MONTH] == {m} && [DAY] >= {d - 2} && [DAY] <= {d + 2})' for y, m, d in DIWALI)
+E_DIWALI_NIGHT = f'({E_DIWALI}) && [HOUR_0_23] >= 18'
+E_XMAS = '[MONTH] == 12 && [DAY] >= 24 && [DAY] <= 26'
+E_NYE = '([MONTH] == 12 && [DAY] == 31 && [HOUR_0_23] >= 22) || ([MONTH] == 1 && [DAY] == 1 && [HOUR_0_23] < 1)'
+E_NEWYEAR = '[MONTH] == 1 && [DAY] == 1'
+E_FIREWORKS = f'({E_DIWALI_NIGHT}) || ({E_NYE})'
 
 
 def text(x, y, w, h, body, family=OSWM, size=12, color='#ffffff', align='CENTER', spacing=None, extra='', shadow=None):
     ls = f' letterSpacing="{spacing}"' if spacing is not None else ''
-    sh = f'<Shadow color="#d8000000" offsetX="0" offsetY="1.5" radius="{shadow}"/>' if shadow else ''
+    if shadow: body = f'<Shadow color="#d8000000" offsetX="0" offsetY="1.5" radius="{shadow}">{body}</Shadow>'
     return (f'<PartText x="{x}" y="{y}" width="{w}" height="{h}">{extra}<Text align="{align}">'
-            f'<Font family="{family}" size="{size}" color="{color}"{ls}>{sh}{body}</Font></Text></PartText>')
+            f'<Font family="{family}" size="{size}" color="{color}"{ls}>{body}</Font></Text></PartText>')
+
+
+CYAN, NEON_RED = '#46ebff', '#ff3c5a'
+
+
+def dots(x, y, w, body, color, glow=None, size=40, family='dots', extra='', glow_r=3, shade=None, shade_r=9, shade_dy=2):
+    """lit-window text: line box is exactly 0.7*size tall so the 7 rows land on the window grid"""
+    if glow: body = f'<OutGlow color="{glow}" radius="{glow_r}">{body}</OutGlow>'
+    if shade: body = f'<Shadow color="{shade}" offsetX="0" offsetY="{shade_dy}" radius="{shade_r}">{body}</Shadow>'
+    return (f'<PartText x="{x}" y="{y}" width="{w}" height="{round(size * 0.7)}">{extra}<Text align="CENTER">'
+            f'<Font family="{family}" size="{size}" color="{color}">{body}</Font></Text></PartText>')
 
 
 def tmpl(fmt, *exprs):
@@ -44,9 +77,13 @@ def rect(x, y, w, h, color, extra=''):
     return f'<PartDraw x="{x}" y="{y}" width="{w}" height="{h}">{extra}<Rectangle x="0" y="0" width="{w}" height="{h}"><Fill color="{color}"/></Rectangle></PartDraw>'
 
 
+_n = [0]
 def cond(pairs, default=''):
-    ex = ''.join(f'<Expression name="{n}"><![CDATA[{e}]]></Expression>' for n, e, _ in pairs)
-    cmp_ = ''.join(f'<Compare expression="{n}">{body}</Compare>' for n, _, body in pairs)
+    ex, cmp_ = '', ''
+    for n, e, body in pairs:
+        _n[0] += 1; nm = f'{n}{_n[0]}'
+        ex += f'<Expression name="{nm}"><![CDATA[{e}]]></Expression>'
+        cmp_ += f'<Compare expression="{nm}">{body}</Compare>'
     d = f'<Default>{default}</Default>' if default else ''
     return f'<Condition><Expressions>{ex}</Expressions>{cmp_}{d}</Condition>'
 
@@ -71,13 +108,59 @@ def mask(w, h, name, frames, rate, play='ON_VISIBLE'):
 def fr(prefix, n): return [f'{prefix}_{i:02d}' for i in range(n)]
 
 
-live = []
+# ---------------- lighting: pick the graded sprite for the time of day
+LIGHT = [('lgn', E_NIGHT, 'night'), ('lam', E_AM, 'am'), ('lpm', E_PM, 'pm')]
 
+
+def graded(make, grades):
+    """make(g) -> xml for grade g; chooses night / golden morning / golden evening / day among the available grades."""
+    pairs = [(n, e, make(g)) for n, e, g in LIGHT if g in grades]
+    default_g = 'day' if 'day' in grades else grades[0]
+    return cond(pairs, make(default_g)) if pairs else make(default_g)
+
+
+def still(prefix, grades):
+    def make(g):
+        n = f'h_{prefix}_{g}'
+        x, y, w, h = ART['stills'][n]
+        return img(x, y, w, h, n)
+    return graded(make, grades)
+
+
+def seq(name, grades, play='ON_VISIBLE', thumb='first', before='THUMBNAIL', after='THUMBNAIL', repeat=False, delay=None, loops=1, order=None, rate=None):
+    def make(g):
+        g2 = g if f'{name}_{g}' in ART['seqs'] else ('night' if g == 'night' and f'{name}_night' in ART['seqs'] else
+                                                       next(k.split('_')[-1] for k in ART['seqs'] if k.rsplit('_', 1)[0] == name))
+        s = ART['seqs'][f'{name}_{g2}']
+        x, y, w, h = s['box']
+        frames = [s['frames'][i] for i in order] if order else s['frames']
+        th = None
+        if thumb == 'first': th = frames[0]
+        elif thumb == 'last': th = frames[-1]
+        elif thumb: th = thumb(g, s)
+        return anim(x, y, w, h, frames, rate or s['fps'], loops, play=play, thumb=th, before=before, after=after, repeat=repeat, delay_repeat=delay)
+    return graded(make, grades)
+
+
+def tap_thumb(seq_name):
+    """the graded base still re-cropped into a tap sequence's box (so the right lighting shows between taps)."""
+    def th(g, s):
+        name = f'h_thumb_{seq_name}_{g}'
+        if not os.path.exists(DRW + name + '.png'):
+            bx, by, bw, bh = s['box']
+            base = f'h_base_{g}'
+            x, y, w, h = ART['stills'][base]
+            canvas = Image.new('RGBA', (248, 260), (0, 0, 0, 0))
+            canvas.alpha_composite(Image.open(DRW + base + '.png').convert('RGBA'), (x, y))
+            canvas.crop((bx, by, bx + bw, by + bh)).save(DRW + name + '.png')
+        return name
+    return th
+
+
+live = []
 # ---------------- sky (time of day / weather) + city
-sky = cond([('sst', E_STORM, img(0, 0, 480, 380, 'sky_storm')),
-            ('snt', E_NIGHT, img(0, 0, 480, 380, 'sky_night')),
-            ('srn', E_RAIN, img(0, 0, 480, 380, 'sky_rain')),
-            ('ssn', E_SNOW, img(0, 0, 480, 380, 'sky_snow')),
+sky = cond([('sst', E_STORM, img(0, 0, 480, 380, 'sky_storm')), ('snt', E_NIGHT, img(0, 0, 480, 380, 'sky_night')),
+            ('srn', E_RAIN, img(0, 0, 480, 380, 'sky_rain')), ('ssn', E_SNOW, img(0, 0, 480, 380, 'sky_snow')),
             ('scl', f'({E_CLOUD}) || ({E_FOG})', img(0, 0, 480, 380, 'sky_cloudy')),
             ('sdw', '[HOUR_0_23] >= 5 && [HOUR_0_23] < 7', img(0, 0, 480, 380, 'sky_dawn')),
             ('sdk', '[HOUR_0_23] >= 17 && [HOUR_0_23] < 19', img(0, 0, 480, 380, 'sky_dusk'))],
@@ -120,9 +203,22 @@ def sky_bodies(part):
 
 
 live.append(sky_bodies('disc'))
+# fireworks over the city on Diwali nights and at New Year
+FW = ''.join(anim(x, y, 120, 120, fr(f'fw_{c}', 14), 14, 1, play='ON_VISIBLE', before='HIDE', after='HIDE', repeat=True, delay_repeat=d)
+             for (x, y, c, d) in ((24, 24, 'gold', 1.4), (300, 6, 'rose', 2.2), (170, 92, 'teal', 3.0), (370, 96, 'gold', 2.6)))
+live.append(cond([('fw', E_FIREWORKS, f'<Group name="fireworks" x="0" y="0" width="480" height="240">{FW}</Group>')]))
 live.append(cond([('twn', E_NIGHT, img(0, 0, 480, 380, 'towers_night'))], img(0, 0, 480, 380, 'towers_day')))
 live.append(sky_bodies('glow'))
 live.append(cond([('cn', E_NIGHT, img(0, 176, 480, 204, 'city_night'))], img(0, 176, 480, 204, 'city_day')))
+
+
+
+def string_lights(k):
+    return (img(0, 176, 480, 204, f'lights_{k}_a', f'<Transform target="alpha" value="150 + 105 * sin({SECF} * 3.1416)"/>')
+            + img(0, 176, 480, 204, f'lights_{k}_b', f'<Transform target="alpha" value="150 - 105 * sin({SECF} * 3.1416)"/>'))
+
+
+live.append(cond([('ldw', E_DIWALI, string_lights('dw')), ('lxm', E_XMAS, string_lights('xm'))]))
 
 # ---------------- weather above the walking line
 rain_layer = img(0, -360, 480, 720, 'wx_rain', f'<Transform target="y" value="(({SECF}) % 3) * 120 - 360"/>')
@@ -134,63 +230,98 @@ weather = cond([('st', E_STORM, rain_layer + flash), ('ra', E_RAIN, rain_layer),
 live.append(f'<Group name="weather" x="0" y="0" width="480" height="480">{weather}</Group>')
 live.append(rect(0, 380, 480, 100, '#000000'))
 
-# ---------------- date (+ temperature) and time
+# ---------------- time: lit-window dot font, cyan (12/24 h follows the watch)
+TIME_S, TIME_Y = 90, 73
+WHITE = '#f4f4f2'
 DATE = '%s · %s %s'
-live.append(cond([('tmp', '[WEATHER.IS_AVAILABLE] == 1',
-                   text(0, 26, 480, 26, f'<Upper>{tmpl(DATE + "  ·  %s°", "[DAY_OF_WEEK_S]", "[DAY_Z]", "[MONTH_S]", "[WEATHER.TEMPERATURE]")}</Upper>', size=19, color='#d6d6da', spacing=0.22, shadow=6))],
-                 text(0, 26, 480, 26, f'<Upper>{tmpl(DATE, "[DAY_OF_WEEK_S]", "[DAY_Z]", "[MONTH_S]")}</Upper>', size=19, color='#d6d6da', spacing=0.22, shadow=6)))
-live.append('<Group name="time" x="0" y="46" width="480" height="124"><Launch target="ALARM"/>'
-            + ''.join('<DigitalClock x="0" y="0" width="480" height="124">'
-                      f'<TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER" x="{dx}" y="{dy}" width="480" height="124"><Font family="{BOD}" size="120" color="{c}"/></TimeText>'
-                      '</DigitalClock>' for dx, dy, c in ((0, 4, '#50000000'), (0, 2, '#80000000')))
-            + '<DigitalClock x="0" y="0" width="480" height="124">'
-            f'<TimeText format="hh:mm" hourFormat="SYNC_TO_DEVICE" align="CENTER" x="0" y="0" width="480" height="124"><Font family="{BOD}" size="120" color="#f4f4f2"/></TimeText>'
-            '</DigitalClock></Group>')
-
-# ---------------- health (battery) column, left edge (centre x = 105)
-BX = 37
-live.append(cond([('chg', E_CHG, img(142, 184, 11, 15, 'ic_bolt'))]))
-live.append(text(18, 176, 100, 40, tmpl('%s', '[BATTERY_PERCENT]'), size=32, align='END'))
-live.append(text(119, 184, 40, 28, lit('%'), size=21, align='START'))
-for i in range(10):
-    live.append(rect(BX + i * 14, 218, 10, 10, '#2a2a2e'))
+def clock(color, family='dots_time', size=TIME_S, glow=None, shade=None, glow_r=7):
+    h24 = dots(0, 0, 480, tmpl('%s:%s', '[HOUR_0_23_Z]', '[MINUTE_Z]'), color, glow, size, family, glow_r=glow_r, shade=shade)
+    h12 = dots(0, 0, 480, tmpl('%s:%s', '[HOUR_1_12_Z]', '[MINUTE_Z]'), color, glow, size, family, glow_r=glow_r, shade=shade)
+    return cond([('h24', '[IS_24_HOUR_MODE] == 1', h24)], h12)
 
 
-def blocks(color, blink=False):
+live.append(f'<Group name="time" x="0" y="{TIME_Y}" width="480" height="{round(TIME_S * 0.7)}"><Launch target="ALARM"/>'
+            + clock(WHITE, shade='#e6000000') + clock(WHITE, glow='#73ffffff', glow_r=5) + '</Group>')
+
+# ---------------- battery: a colour-coded arc hugging the left edge (green > yellow > red), no number
+ARC_A0, ARC_A1, NSEG = 242.0, 300.0, 10          # degrees, 0 = 12 o'clock, clockwise; fills from the bottom up
+SEG = (ARC_A1 - ARC_A0) / NSEG
+GREEN, YELLOW, REDB, TRACK = '#3ddc84', '#f5c542', '#ff4b4b', '#34343a'
+
+
+def seg(i, color, extra='', thick=7):
+    a0 = ARC_A0 + i * SEG + 0.8; a1 = ARC_A0 + (i + 1) * SEG - 0.8
+    return (f'<PartDraw x="0" y="0" width="480" height="480">{extra}'
+            f'<Arc centerX="240" centerY="240" width="452" height="452" startAngle="{a0:.2f}" endAngle="{a1:.2f}">'
+            f'<Stroke color="{color}" thickness="{thick}" cap="BUTT"/></Arc></PartDraw>')
+
+
+def arc_fill(color, blink=False):
     b = ' * ([SECOND] % 2 == 0 ? 1 : 0.35)' if blink else ''
-    return ''.join(rect(BX + i * 14, 218, 10, 10, color, f'<Transform target="alpha" value="([BATTERY_PERCENT] &gt;= {i * 10 + 5} ? 255 : 0){b}"/>') for i in range(10))
+    return ''.join(seg(i, color, f'<Transform target="alpha" value="([BATTERY_PERCENT] &gt; {i * 10} ? 255 : 0){b}"/>') for i in range(NSEG))
 
 
-live.append(cond([('bl', E_LOW, blocks('#ff6a3d', True)), ('bn', E_NIGHT, blocks(RED))], blocks(GOLD)))
-live.append(cond([('cp', E_CHG, rect(BX, 218, 10, 10, '#ffe08a',
-                                     f'<Transform target="x" value="{BX} + 14 * ([BATTERY_PERCENT] &gt;= 95 ? 9 : floor(([BATTERY_PERCENT] + 5) / 10))"/>'
-                                     f'<Transform target="alpha" value="140 + 115 * sin({SECF} * 6.2832)"/>'))]))
+live.append(''.join(seg(i, TRACK) for i in range(NSEG)))
+live.append(cond([('bl', E_LOW, arc_fill(REDB, blink=True)), ('bm', '[BATTERY_PERCENT] < 50', arc_fill(YELLOW))], arc_fill(GREEN)))
+# charging: the next segment breathes
+live.append(cond([('cp', E_CHG, ''.join(seg(i, '#c8ffe0', f'<Transform target="alpha" value="([BATTERY_PERCENT] &gt; {i * 10} &amp;&amp; [BATTERY_PERCENT] &lt;= {(i + 1) * 10}) ? (140 + 115 * sin({SECF} * 6.2832)) : 0"/>') for i in range(NSEG)))]))
 
 
-def status(word, color): return text(18, 232, 175, 18, lit(word), size=13, color=color, spacing=0.12)
+# ---------------- the towers: date (left, tap -> calendar) and pulse (right, tap -> heart rate)
+PI_, GY0 = GEO['pitch'], GEO['gy0']
+WR, WC0, WST = GEO['week']
 
 
-live.append(cond([('sc', E_CHG, status('RELOADING…', '#ffe08a')),
-                  ('sl', E_LOW, status('CRITICAL', '#ff8a4a')),
-                  ('swn', f'[BATTERY_PERCENT] < 50 && ({E_NIGHT})', status('WOUNDED', PINK)),
-                  ('sw', '[BATTERY_PERCENT] < 50', status('WOUNDED', CREAM)),
-                  ('srn', E_NIGHT, status('COMBAT READY', PINK))],
-                 status('COMBAT READY', CREAM)))
-
-# ---------------- heart-rate column, right edge (tap -> heart rate)
-def hstatus(word, color): return text(0, 56, 175, 18, lit(word), size=13, color=color, spacing=0.12)
+def row_y(r0, gy): return GY0 + r0 * PI_ - gy
 
 
-live.append('<Group name="heart" x="288" y="176" width="175" height="74"><Launch target="HEALTH_HEART_RATE"/>'
-            + anim(19, 8, 24, 22, fr('heart', 6)[:0] + [f'heart_{i}' for i in range(6)], 8, 1, play='ON_VISIBLE', thumb='heart_0', repeat=True)
-            + text(43, 0, 62, 40, tmpl('%s', '[HEART_RATE]'), size=32)
-            + text(107, 13, 50, 20, lit('BPM'), size=14, color='#d6d6da', spacing=0.1, align='START')
-            + img(32, 40, 110, 14, 'ecg')
-            + cond([('rage', '[HEART_RATE] >= 140', hstatus('ADRENALINE', '#ff3b52')),
-                    ('edge', '[HEART_RATE] >= 100', hstatus('ON EDGE', PINK)),
-                    ('hn', E_NIGHT, hstatus('CALM', PINK))],
-                   hstatus('CALM', CREAM))
+def tower_group(name, side, target, inner):
+    x0 = GEO['x0'][side]; gx, gy = x0 - 4 * PI_, 158          # text boxes are 36 cells wide, centred on the 27-column tower
+    return f'<Group name="{name}" x="{gx}" y="{gy}" width="{36 * PI_}" height="120"><Launch target="{target}"/>{inner(x0, gx, gy)}</Group>'
+
+
+def lit2(y, body, color, glow, family='dots', extra=''):
+    """dark halo layer for contrast over the skyline + the glowing layer on top"""
+    return (dots(0, y, 36 * PI_, body, color, family=family, extra=extra, shade='#cc000000', shade_r=5, shade_dy=0)
+            + dots(0, y, 36 * PI_, body, color, glow, family=family, extra=extra))
+
+
+def date_tower(x0, gx, gy):
+    g = '#9946ebff'
+    out = lit2(row_y(1, gy), f'<Upper>{tmpl("%s %s", "[DAY]", "[MONTH_S]")}</Upper>', CYAN, g)
+    out += lit2(row_y(8, gy), f'<Upper>{tmpl("%s", "[DAY_OF_WEEK_S]")}</Upper>', CYAN, g)
+    wx = x0 - gx + WC0 * PI_; wy = row_y(WR, gy)          # today's window in the Sun..Sat row
+    out += (f'<PartDraw x="{wx}" y="{wy}" width="{6 * WST * PI_ + 4}" height="4">'
+            + ''.join(f'<Rectangle x="{k * WST * PI_ + 0.5}" y="0.5" width="3" height="3"><Fill color="#6e46ebff"/></Rectangle>' for k in range(7))
+            + '</PartDraw>')
+    out += (f'<PartDraw x="{wx - 2}" y="{wy - 2}" width="8" height="8">'
+            f'<Transform target="x" value="{wx - 2} + ([DAY_OF_WEEK] - 1) * {WST * PI_}"/>'
+            f'<Rectangle x="0.5" y="0.5" width="7" height="7"><Fill color="#5546ebff"/></Rectangle>'
+            f'<Rectangle x="2.5" y="2.5" width="3" height="3"><Fill color="{CYAN}"/></Rectangle></PartDraw>')
+    return out
+
+
+def state(word, blink=False):
+    ex = f'<Transform target="alpha" value="([SECOND] % 2 == 0) ? 255 : 120"/>' if blink else ''
+    return lit2(0, lit(word), NEON_RED, '#99ff3c5a', extra=ex)
+
+
+def pulse_tower(x0, gx, gy):
+    g = '#99ff3c5a'
+    hr = tmpl('\u2665%s', '[HEART_RATE]')
+    out = cond([('hr0', '[HEART_RATE] <= 0', lit2(row_y(1, gy), lit('\u2665--'), NEON_RED, g))],
+               lit2(row_y(1, gy), hr, NEON_RED, g))
+    beat = f'<Transform target="alpha" value="150 + 105 * sin({SECF} * 6.2832 * ([HEART_RATE] &gt; 0 ? [HEART_RATE] : 60) / 60)"/>'
+    out += cond([('hb0', '[HEART_RATE] <= 0', dots(0, row_y(1, gy), 36 * PI_, lit('\u2665--'), NEON_RED, g, family='dots_heart', extra=beat))],
+                dots(0, row_y(1, gy), 36 * PI_, hr, NEON_RED, g, family='dots_heart', extra=beat))
+    out += (f'<Group name="hr_state" x="0" y="{row_y(8, gy)}" width="{36 * PI_}" height="28">'
+            + cond([('rush', '[HEART_RATE] >= 140', state('RUSH', blink=True)), ('edge', '[HEART_RATE] >= 100', state('ALERT'))], state('CALM'))
             + '</Group>')
+    return out
+
+
+live.append(tower_group('date_tower', 'l', 'CALENDAR', date_tower))
+live.append(tower_group('pulse_tower', 'r', 'HEALTH_HEART_RATE', pulse_tower))
 
 # ---------------- bounty trail with 25/50/75 milestones
 TX0, TW = 70, 282
@@ -209,56 +340,82 @@ for mk in (25, 50, 75):
 live.append(cond([('tn', E_NIGHT, trail('#c8102e'))], trail(GOLD)))
 live.append(cond([('cd', E_DONE, img(352, 360, 30, 30, 'coin_done')), ('cnn', E_NIGHT, img(352, 360, 30, 30, 'coin_red'))], img(352, 360, 30, 30, 'coin_gold')))
 
-# ---------------- adrenaline glow behind him
-glow = (f'<Group name="glow" x="0" y="250" width="120" height="120"><Transform target="x" value="{FIGX} - 10"/>'
+# ---------------- diyas along the path during Diwali
+DIYA = ''.join(anim(x, 356, 24, 22, ['diya_0', 'diya_1', 'diya_2', 'diya_1'], 6 + (i % 3), 1, play='ON_VISIBLE', thumb='diya_0', repeat=True)
+               for i, x in enumerate((44, 96, 208, 268, 330, 412)))
+live.append(cond([('dy', E_DIWALI, f'<Group name="diyas" x="0" y="0" width="480" height="400">{DIYA}</Group>')]))
+
+# ---------------- the hero and his dog: positions
+DUOX = f'(63 + 0.97 * {P})'
+GX = f'{DUOX} - 32'
+GY = 180
+MOVE = f'<Transform target="x" value="{GX}"><Animation duration="2.5" interpolation="EASE_IN_OUT"/></Transform>'
+
+pool = (f'<Group name="pool" x="0" y="205" width="240" height="200"><Transform target="x" value="{DUOX} - 19">'
+        f'<Animation duration="2.5" interpolation="EASE_IN_OUT"/></Transform>' + img(0, 0, 240, 200, 'pool') + '</Group>')
+live.append(pool)
+glow = (f'<Group name="glow" x="0" y="250" width="120" height="120"><Transform target="x" value="{DUOX} + 64"/>'
         + img(0, 0, 120, 120, 'glow', f'<Transform target="alpha" value="150 + 100 * sin({SECF} * 6.2832 * [HEART_RATE] / 60)"/>') + '</Group>')
 live.append(cond([('adr', f'[HEART_RATE] >= 120 && !({E_DONE})', glow)]))
 
-# ---------------- the hero and his dog (always together)
-FY = 241
-DUOX = f'({FIGX} - 50 &gt;= 30 ? {FIGX} - 50 : 30)'
-DMOVE = f'<Transform target="x" value="{DUOX}"><Animation duration="2.5" interpolation="EASE_IN_OUT"/></Transform>'
-DOGY = 70
 
-pool_move = (f'<Group name="pool" x="0" y="205" width="240" height="200"><Transform target="x" value="{DUOX} - 20">'
-             f'<Animation duration="2.5" interpolation="EASE_IN_OUT"/></Transform>' + img(0, 0, 240, 200, 'pool') + '</Group>')
-live.append(cond([('pd', E_DONE, img(184, 205, 240, 200, 'pool'))], pool_move))
+def duo_group(name, body, fixed_x=None):
+    if fixed_x is not None:
+        return f'<Group name="{name}" x="{fixed_x}" y="{GY}" width="248" height="232">{body}</Group>'
+    return f'<Group name="{name}" x="0" y="{GY}" width="248" height="232">{MOVE}{body}</Group>'
 
 
-def duo_group(name, body):
-    return f'<Group name="{name}" x="0" y="{FY}" width="150" height="161">{DMOVE}{body}</Group>'
+DN = ('day', 'night')
+REFL_Y = 195
 
 
-def tap(seq):
-    return anim(0, 0, 150, 161, LISTS[seq], 20, 1, play='TAP', thumb='duo_base')
+def refl(kind):
+    return cond([('rn', E_NIGHT, img(0, REFL_Y, 248, 26, f'h_refl_{kind}_night'))], img(0, REFL_Y, 248, 26, f'h_refl_{kind}_day'))
+
+
+# default: walk in on wake, then together; tap for one of three moves
+def tap(seq_name):
+    return seq(seq_name, ('day', 'am', 'pm', 'night'), play='TAP', thumb=tap_thumb(seq_name))
 
 
 together = duo_group('duo',
-    anim(0, DOGY, 60, 66, LISTS['dog_wake'], 20, 1, play='ON_VISIBLE', before='HIDE', after='HIDE')
-    + anim(50, 0, 100, 161, LISTS['man_wake'], 16, 1, play='ON_VISIBLE', before='HIDE', after='HIDE')
-    + '<Group name="duo_tap" x="0" y="0" width="150" height="161">'
-    + cond([('t1', '[SECOND] < 15', tap('nuzzle')), ('t2', '[SECOND] < 30', tap('coin')), ('t3', '[SECOND] < 45', tap('pat'))], tap('sip'))
-    + mask(150, 161, 'mask_duo', 24, 5) + '</Group>')
-notif = duo_group('duo_notif', anim(0, 0, 150, 161, LISTS['notif'], 20, 1, play='ON_VISIBLE TAP', thumb='duo_base', repeat=True, delay_repeat=3))
-charging = duo_group('duo_chg', img(0, DOGY, 60, 66, 'dog3_look')
-                     + anim(50, 0, 100, 161, fr('g_sip', 32), 16, 1, play='ON_VISIBLE TAP', thumb='g_sip_28', repeat=True, delay_repeat=2.5))
-low = duo_group('duo_low', img(0, 85, 60, 51, 'dog_lie') + img(50, 0, 100, 161, 'g_tired'))
-behind = duo_group('duo_lean', img(0, 85, 60, 51, 'dog_lie_up') + img(50, 0, 100, 161, 'g_lean'))
-done = (anim(204, FY + DOGY, 60, 66, fr('dog3_happy', 8), 10, 1, play='ON_VISIBLE', thumb='dog3_happy_00', repeat=True)
-        + anim(254, FY, 100, 161, ['g_cheer_00', 'g_cheer_01'], 3, 4, thumb='g_cheer_00')
+    seq('wake_dog', DN, before='HIDE', after='HIDE', thumb=None)
+    + seq('wake_man', DN, before='HIDE', after='HIDE', thumb=None)
+    + '<Group name="duo_tap" x="0" y="0" width="248" height="232">'
+    + cond([('t1', '[SECOND] < 20', tap('pat')), ('t2', '[SECOND] < 40', tap('coin'))], tap('sip'))
+    + mask(248, 232, 'mask_duo', 16, 6) + '</Group>')
+
+morning = duo_group('duo_morning', still('morning_man', ('am',)) + seq('steam', ('none',), repeat=True, thumb='first', play='ON_VISIBLE')
+                    + seq('yawn', ('am',), thumb='last'))
+hot = duo_group('duo_hot', still('hot_man', ('day', 'pm')) + seq('pant', ('day', 'pm'), repeat=True, rate=6))
+rain = duo_group('duo_rain', refl('rain') + seq('shake', DN, thumb='last') + still('rain_man', DN))
+storm = duo_group('duo_storm', refl('storm') + still('storm', DN))
+snow = duo_group('duo_snow', still('snow', DN) + seq('breath', ('none',), repeat=True, thumb=None, before='HIDE'))
+cold = duo_group('duo_cold', still('cold', DN) + seq('breath', ('none',), repeat=True, thumb=None, before='HIDE'))
+late = duo_group('duo_late', seq('sleep', ('night',), repeat=True) + still('night_man', ('night',)))
+notif = duo_group('duo_notif', still('notif_man', ('day', 'am', 'pm', 'night')) + seq('bark', DN, play='ON_VISIBLE TAP', repeat=True, delay=3))
+charging = duo_group('duo_chg', seq('sip', ('day', 'am', 'pm', 'night'), play='ON_VISIBLE TAP', thumb=tap_thumb('sip'), repeat=True, delay=3))
+low = duo_group('duo_low', still('low', DN))
+behind = duo_group('duo_lean', still('behind', DN))
+workout = duo_group('duo_jog', seq('jog', DN, repeat=True))
+done = (duo_group('duo_done', seq('cheer', DN, repeat=True, loops=2, delay=2), fixed_x=104)
         + anim(292, 300, 150, 150, fr('burst', 20), 15, 1, before='HIDE', after='HIDE'))
-live.append(cond([('hd', E_DONE, done),
-                  ('hn', '[UNREAD_NOTIFICATION_COUNT] > 0', notif),
-                  ('hc', E_CHG, charging),
-                  ('hl', E_LOW, low),
-                  ('hb', E_BEHIND, behind)],
+diwali = duo_group('duo_diwali', still('diwali_dog', ('night',)) + still('diwali_man', ('night',)) + seq('sparks', ('none',), repeat=True))
+xmas = duo_group('duo_xmas', still('xmas', DN))
+nye = duo_group('duo_nye', still('nye', ('night',)))
+
+live.append(cond([('hd', E_DONE, done), ('hn', E_NOTIF, notif), ('hc', E_CHG, charging), ('hl', E_LOW, low), ('hw', E_WORK, workout),
+                  ('hs', E_STORM, storm), ('hny', E_NYE, nye), ('hdw', E_DIWALI_NIGHT, diwali), ('hx', E_XMAS, xmas),
+                  ('hr', E_RAIN, rain), ('hsn', E_SNOW, snow), ('hco', E_COLD, cold), ('hb', E_BEHIND, behind), ('hh', E_HOT, hot),
+                  ('hlt', E_LATE, late), ('hm', E_MORNING, morning)],
                  together))
 
 # ---------------- bounty / contract text
 count = text(0, 408, 480, 44, tmpl('%s / %s', '[STEP_COUNT]', '[STEP_GOAL]'), size=34)
-bounty = cond([('tb', E_BEHIND, text(0, 390, 480, 22, lit('BEHIND PACE · TIME TO MOVE'), size=15, color='#ffb347', spacing=0.16)),
-               ('tn', E_NIGHT, text(0, 390, 480, 22, lit("TONIGHT'S BOUNTY"), size=15, color=PINK, spacing=0.2))],
-              text(0, 390, 480, 22, lit("TODAY'S BOUNTY"), size=15, color=GOLDL, spacing=0.2)) + count
+def label(s, color, sp=0.2): return text(0, 390, 480, 22, lit(s), size=15, color=color, spacing=sp)
+bounty = cond([('tb', E_BEHIND, label('BEHIND PACE · TIME TO MOVE', '#ffb347', 0.16)),
+               ('tny', E_NEWYEAR, label('HAPPY NEW YEAR', GOLDL)), ('tdw', E_DIWALI, label('HAPPY DIWALI', '#ffc14d')),
+               ('txm', E_XMAS, label('MERRY CHRISTMAS', '#ff6b74'))]) + count     # no everyday label: just the step numbers
 done_txt = ('<Group name="done_txt" x="0" y="384" width="480" height="80">'
             + text(0, 6, 480, 32, lit('CONTRACT FULFILLED'), size=22, color='#f4f4f2', spacing=0.17)
             + rect(152, 40, 176, 2, RED)
@@ -266,8 +423,34 @@ done_txt = ('<Group name="done_txt" x="0" y="384" width="480" height="80">'
             + mask(480, 80, 'mask_txt', 20, 15) + '</Group>')
 live.append(cond([('dt', E_DONE, done_txt)], bounty))
 
+# ---------------- always-on screen: calm and dim (well under the 10 MB ambient budget)
+ax, ay, aw, ah = ART['stills']['aod_duo']
+AS = 0.62
+aod = ('<Group name="aod" x="0" y="0" width="480" height="480" alpha="0"><Variant mode="AMBIENT" target="alpha" value="255"/>'
+       + text(0, 92, 480, 26, f'<Upper>{tmpl(DATE, "[DAY_OF_WEEK_S]", "[DAY_Z]", "[MONTH_S]")}</Upper>', size=18, color='#8c8c94', spacing=0.22)
+       + '<Group name="aod_time" x="0" y="124" width="480" height="63">' + clock('#bdbdc2', family='dots', size=90) + '</Group>'
+       + text(0, 236, 480, 30, tmpl('%s / %s', '[STEP_COUNT]', '[STEP_GOAL]'), size=22, color='#8a7a48', spacing=0.06)
+       + img(round(240 - aw * AS / 2 + 10), round(388 - ah * AS), round(aw * AS), round(ah * AS), 'aod_duo')
+       + rect(150, 388, 180, 2, '#3a3a40')
+       + '</Group>')
+
+# ---------------- complication slot under the time (next event by default; customisable)
+COMP = ('<ComplicationSlot slotId="0" name="under_time" displayName="Under the time" x="140" y="148" width="200" height="26" '
+        'supportedTypes="SHORT_TEXT LONG_TEXT EMPTY" isCustomizable="TRUE">'
+        '<Variant mode="AMBIENT" target="alpha" value="0"/>'
+        '<DefaultProviderPolicy defaultSystemProvider="NEXT_EVENT" defaultSystemProviderType="SHORT_TEXT"/>'
+        '<BoundingBox x="0" y="0" width="200" height="26"/>'
+        '<Complication type="SHORT_TEXT">'
+        + text(0, 0, 200, 26, f'<Upper>{tmpl("%s  %s", "[COMPLICATION.TEXT]", "[COMPLICATION.TITLE]")}</Upper>', size=15, color=CREAM, spacing=0.1, shadow=5)
+        + '</Complication>'
+        '<Complication type="LONG_TEXT">'
+        + text(0, 0, 200, 26, f'<Upper>{tmpl("%s", "[COMPLICATION.TEXT]")}</Upper>', size=15, color=CREAM, spacing=0.08, shadow=5)
+        + '</Complication>'
+        '<Complication type="EMPTY"></Complication>'
+        '</ComplicationSlot>')
+
 xml = f'''<?xml version="1.0" encoding="utf-8"?>
-<!-- On the Hunt v2.6: steps = today's bounty, battery = health. Original characters (the coffee guy and his golden dog). -->
+<!-- On the Hunt v2.9.2: steps = today's bounty, battery = health. Original characters (the coffee guy and his golden retriever). -->
 <WatchFace width="480" height="480">
   <Metadata key="CLOCK_TYPE" value="DIGITAL"/>
   <Metadata key="PREVIEW_TIME" value="10:08:32"/>
@@ -276,8 +459,11 @@ xml = f'''<?xml version="1.0" encoding="utf-8"?>
       <Variant mode="AMBIENT" target="alpha" value="0"/>
       {"".join(live)}
     </Group>
+    {aod}
+    {COMP}
   </Scene>
 </WatchFace>
 '''
+os.makedirs(os.path.dirname(OUT_XML), exist_ok=True)
 open(OUT_XML, 'w').write(xml)
 print('written', len(xml))

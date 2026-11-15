@@ -18,7 +18,7 @@ Either way, the phone or computer must be on the **same Wi-Fi** as your watch.
 ## Option A – phone only (no computer)
 
 1. On your phone, install **[Bugjaeger Mobile ADB](https://play.google.com/store/apps/details?id=eu.sisik.hackendebug)** from the Play Store.
-2. On your phone, download **`OnTheHunt-watchface-v2.6.apk`** from the [latest release](https://github.com/johnjitto-m/on-the-hunt-watchface/releases/latest).
+2. On your phone, download **`OnTheHunt-watchface-v2.9.2.apk`** from the [latest release](https://github.com/johnjitto-m/on-the-hunt-watchface/releases/latest).
 3. On the watch: **Wireless debugging › Pair new device**. It shows a **6-digit code** and an **IP:port**.
 4. In Bugjaeger: tap the connect/pair option for wireless debugging, enter that IP, port and code, and pair. Then connect to the watch.
 5. In Bugjaeger, open the **Packages** tab → tap **+** (install) → pick the APK you downloaded. Wait for it to finish.
@@ -57,7 +57,7 @@ Check it works: `adb version`
 ### 3. Install
 
 ```bash
-adb install -r OnTheHunt-watchface-v2.6.apk
+adb install -r OnTheHunt-watchface-v2.9.2.apk
 ```
 Wait for **Success**. If you see *"more than one device"*, add `-s <IP:port>` after `adb`.
 

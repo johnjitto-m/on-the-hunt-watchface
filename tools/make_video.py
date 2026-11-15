@@ -3,8 +3,8 @@ import math, os, subprocess, sys
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 D = 'build/art/'
-FONTS = {'bebas': 'watchface/src/main/res/font/bebas_neue.ttf', 'om': 'watchface/src/main/res/font/oswald_medium.ttf',
-         'or': 'watchface/src/main/res/font/oswald_regular.ttf'}
+FONTS = {'bebas': 'tools/fonts/bebas_neue.ttf', 'om': 'watchface/src/main/res/font/oswald_medium.ttf',
+         'or': 'tools/fonts/oswald_regular.ttf'}
 W, H, FPS = 1080, 1920, 30
 S = 2                     # face drawn at 960 px (2x the watch's 480)
 FACE = 900                # on-screen face size

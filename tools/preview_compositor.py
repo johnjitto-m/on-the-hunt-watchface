@@ -211,39 +211,50 @@ def _hud(im, dr, st, t, size, night, wx):
     lab = '#ff7a8a' if night else GOLDL
     temp = st.get('temp')
     date = st.get('date', 'WED · 11 NOV') + (f'  ·  {temp}°' if temp is not None else '')
-    m.txt(dr, sb((0, 26, 480, 26)), date, 'om', 19 * S, '#d6d6da', sp=0.22)
+    if not st.get('hide_date'): m.txt(dr, sb((0, 26, 480, 26)), date, 'om', 19 * S, '#d6d6da', sp=0.22)
     if st.get('towers'):
         sh = Image.new('RGBA', im.size, (0, 0, 0, 0))
         m.txt(ImageDraw.Draw(sh), sb((0, 48, 480, 124)), st.get('time', '12:59'), 'bebas', 120 * S, (0, 0, 0, 200))
         m.txt(ImageDraw.Draw(sh), sb((0, 27, 480, 26)), date, 'om', 19 * S, (0, 0, 0, 220), sp=0.22)
         im.alpha_composite(sh.filter(ImageFilter.GaussianBlur(5 * S))); dr = ImageDraw.Draw(im)
-    m.txt(dr, sb((0, 46, 480, 124)), st.get('time', '12:59'), 'bebas', 120 * S, '#f4f4f2')
+    if not st.get('hide_time'): m.txt(dr, sb((0, 46, 480, 124)), st.get('time', '12:59'), 'bebas', 120 * S, '#f4f4f2')
     if st.get('towers'): m.txt(dr, sb((0, 26, 480, 26)), date, 'om', 19 * S, '#d6d6da', sp=0.22)
     # health
     bat = st.get('bat', 75); chg = st.get('charging')
     B, Hh = st.get('dxb', 0), st.get('dxh', 0)
-    m.txt(dr, sb((60 + B, 176, 100, 40)), str(bat), 'om', 32 * S, '#ffffff', 'END')
-    m.txt(dr, sb((161 + B, 184, 40, 28)), '%', 'om', 21 * S, '#ffffff', 'START')
-    if chg: im.alpha_composite(asset('ic_bolt'), ((184 + B) * S, 184 * S))
+    if not st.get('hide_bat'):
+        m.txt(dr, sb((60 + B, 176, 100, 40)), str(bat), 'om', 32 * S, '#ffffff', 'END')
+        m.txt(dr, sb((161 + B, 184, 40, 28)), '%', 'om', 21 * S, '#ffffff', 'START')
+    if chg and not st.get('hide_bat'): im.alpha_composite(asset('ic_bolt'), ((184 + B) * S, 184 * S))
     low = bat < 20
     on = round(bat / 10)
     blk = '#ff6a3d' if low else (RED if night else GOLD)
-    for i in range(10):
+    for i in (range(10) if not st.get('hide_bat') else []):
         lit = i < on; col = blk if lit else '#2a2a2e'
         if chg and i == on: col = '#ffe08a'
         if low and lit and st.get('blink'): col = '#3a1a10'
         dr.rectangle(sb((79 + B + i * 14, 218, 79 + B + i * 14 + 10, 228)), fill=col)
     status = 'RELOADING…' if chg else ('CRITICAL' if low else ('WOUNDED' if bat < 50 else 'COMBAT READY'))
     scol = '#ffe08a' if chg else ('#ff8a4a' if low else ('#ff7a8a' if night else '#e8d9a8'))
-    m.txt(dr, sb((60 + B, 232, 175, 18)), status, 'om', 13 * S, scol, sp=0.12)
+    if not st.get('hide_bat') and not st.get('hide_status'): m.txt(dr, sb((60 + B, 232, 175, 18)), status, 'om', 13 * S, scol, sp=0.12)
     if not st.get('nodiv'): dr.rectangle(sb((239, 178, 240, 246)), fill='#3a3a40')
     hr = st.get('hr', 75)
-    im.alpha_composite(asset('heart_2'), ((264 + Hh) * S, 184 * S))
-    m.txt(dr, sb((288 + Hh, 176, 62, 40)), str(hr), 'om', 32 * S, '#ffffff')
-    m.txt(dr, sb((352 + Hh, 189, 50, 20)), 'BPM', 'om', 14 * S, '#d6d6da', 'START', 0.1)
-    im.alpha_composite(asset('ecg'), ((277 + Hh) * S, 216 * S))
-    hs = 'ADRENALINE' if hr >= 140 else ('ON EDGE' if hr >= 100 else 'CALM')
-    m.txt(dr, sb((245 + Hh, 232, 175, 18)), hs, 'om', 13 * S, '#ff7a8a' if (night or hr >= 100) else '#e8d9a8', sp=0.12)
+    if st.get('bat_arc'):
+        col = (255, 75, 75) if low else ((245, 197, 66) if bat < 50 else (61, 220, 132))
+        r = 226 * S; box = [240 * S - r, 240 * S - r, 240 * S + r, 240 * S + r]
+        for i in range(10):
+            a0 = 242 + i * 5.8 + 0.8; a1 = 242 + (i + 1) * 5.8 - 0.8
+            lit = bat > i * 10
+            c = col if lit else (52, 52, 58)
+            if chg and i * 10 < bat <= (i + 1) * 10: c = (200, 255, 224)
+            dr.arc(box, a0 - 90, a1 - 90, fill=c, width=7 * S)
+    if not st.get('hide_hr'):
+        im.alpha_composite(asset('heart_2'), ((264 + Hh) * S, 184 * S))
+        m.txt(dr, sb((288 + Hh, 176, 62, 40)), str(hr), 'om', 32 * S, '#ffffff')
+        m.txt(dr, sb((352 + Hh, 189, 50, 20)), 'BPM', 'om', 14 * S, '#d6d6da', 'START', 0.1)
+        im.alpha_composite(asset('ecg'), ((277 + Hh) * S, 216 * S))
+        hs = 'ADRENALINE' if hr >= 140 else ('ON EDGE' if hr >= 100 else 'CALM')
+        m.txt(dr, sb((245 + Hh, 232, 175, 18)), hs, 'om', 13 * S, '#ff7a8a' if (night or hr >= 100) else '#e8d9a8', sp=0.12)
     # trail
     steps = st.get('steps', 10281); p = min(100, steps * 100 / GOAL)
     TX0, TX1 = 70, 352
@@ -298,10 +309,12 @@ def _hud(im, dr, st, t, size, night, wx):
             im.alpha_composite(asset(f'dog_walk_{int(t * 13) % 6:02d}'), (int(dx * S), 338 * S))
         else:
             im.alpha_composite(asset('dog_sit'), (int(dx * S), 338 * S))
-        if pose == 'lean':
+        if st.get('label'):
+            m.txt(dr, sb((0, 390, 480, 22)), st['label'], 'om', 15 * S, st.get('label_color', '#ffb347'), sp=0.16)
+        elif pose == 'lean':
             m.txt(dr, sb((0, 390, 480, 22)), 'BEHIND PACE · TIME TO MOVE', 'om', 15 * S, '#ffb347', sp=0.16)
         else:
-            m.txt(dr, sb((0, 390, 480, 22)), "TONIGHT'S BOUNTY" if night else "TODAY'S BOUNTY", 'om', 15 * S, lab, sp=0.2)
+            if not st.get('no_bounty'): m.txt(dr, sb((0, 390, 480, 22)), "TONIGHT'S BOUNTY" if night else "TODAY'S BOUNTY", 'om', 15 * S, lab, sp=0.2)
         m.txt(dr, sb((0, 408, 480, 44)), f'{steps:,} / {GOAL:,}', 'om', 34 * S, '#ffffff')
         if st.get('dossier'):
             x0, y0 = int(fx + 92), 256
